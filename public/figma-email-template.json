@@ -1,0 +1,135 @@
+{
+  "version": "1.0.0",
+  "name": "Campaign Lite - Email Newsletter",
+  "description": "A responsive email newsletter design created for Campaign Lite. Import into Figma via File → Import.",
+  "frames": [
+    {
+      "name": "Email Campaign",
+      "type": "FRAME",
+      "width": 600,
+      "height": 800,
+      "backgroundColor": "#ffffff",
+      "children": [
+        {
+          "name": "Header",
+          "type": "RECTANGLE",
+          "x": 0, "y": 0, "width": 600, "height": 120,
+          "fills": [{ "type": "SOLID", "color": "#215CE5" }],
+          "children": [
+            { "name": "Logo Text", "type": "TEXT", "x": 200, "y": 32, "width": 200, "height": 32,
+              "characters": "Campaign Lite",
+              "style": { "fontFamily": "Inter", "fontWeight": 700, "fontSize": 24, "textAlignHorizontal": "CENTER" },
+              "fills": [{ "type": "SOLID", "color": "#FFFFFF" }]
+            },
+            { "name": "Tagline", "type": "TEXT", "x": 150, "y": 72, "width": 300, "height": 20,
+              "characters": "Email marketing for freelancers",
+              "style": { "fontFamily": "Inter", "fontWeight": 400, "fontSize": 14, "textAlignHorizontal": "CENTER" },
+              "fills": [{ "type": "SOLID", "color": "#D9E2FF" }]
+            }
+          ]
+        },
+        {
+          "name": "Hero Section",
+          "type": "RECTANGLE",
+          "x": 0, "y": 120, "width": 600, "height": 180,
+          "fills": [{ "type": "SOLID", "color": "#FFFFFF" }],
+          "children": [
+            { "name": "Hero Title", "type": "TEXT", "x": 60, "y": 40, "width": 480, "height": 40,
+              "characters": "Your monthly update is here!",
+              "style": { "fontFamily": "Inter", "fontWeight": 700, "fontSize": 28, "textAlignHorizontal": "CENTER" },
+              "fills": [{ "type": "SOLID", "color": "#1A1A1A" }]
+            },
+            { "name": "Hero Subtext", "type": "TEXT", "x": 60, "y": 96, "width": 480, "height": 48,
+              "characters": "We've been busy building new features just for you. Here's what's new this month.",
+              "style": { "fontFamily": "Inter", "fontWeight": 400, "fontSize": 16, "textAlignHorizontal": "CENTER", "lineHeightPx": 24 },
+              "fills": [{ "type": "SOLID", "color": "#666666" }]
+            }
+          ]
+        },
+        {
+          "name": "Feature Cards Section",
+          "type": "RECTANGLE",
+          "x": 0, "y": 300, "width": 600, "height": 240,
+          "fills": [{ "type": "SOLID", "color": "#F8F9FA" }],
+          "children": [
+            {
+              "name": "Card 1", "type": "RECTANGLE",
+              "x": 40, "y": 32, "width": 520, "height": 72,
+              "cornerRadius": 8,
+              "fills": [{ "type": "SOLID", "color": "#FFFFFF" }],
+              "children": [
+                { "name": "Card 1 Title", "type": "TEXT", "x": 20, "y": 12, "width": 480, "height": 22,
+                  "characters": "Workflow Automation",
+                  "style": { "fontFamily": "Inter", "fontWeight": 600, "fontSize": 16 },
+                  "fills": [{ "type": "SOLID", "color": "#215CE5" }]
+                },
+                { "name": "Card 1 Desc", "type": "TEXT", "x": 20, "y": 40, "width": 480, "height": 20,
+                  "characters": "Build multi-step campaigns with our visual drag-and-drop editor.",
+                  "style": { "fontFamily": "Inter", "fontWeight": 400, "fontSize": 14 },
+                  "fills": [{ "type": "SOLID", "color": "#666666" }]
+                }
+              ]
+            },
+            {
+              "name": "Card 2", "type": "RECTANGLE",
+              "x": 40, "y": 120, "width": 520, "height": 72,
+              "cornerRadius": 8,
+              "fills": [{ "type": "SOLID", "color": "#FFFFFF" }],
+              "children": [
+                { "name": "Card 2 Title", "type": "TEXT", "x": 20, "y": 12, "width": 480, "height": 22,
+                  "characters": "Rich Templates",
+                  "style": { "fontFamily": "Inter", "fontWeight": 600, "fontSize": 16 },
+                  "fills": [{ "type": "SOLID", "color": "#215CE5" }]
+                },
+                { "name": "Card 2 Desc", "type": "TEXT", "x": 20, "y": 40, "width": 480, "height": 20,
+                  "characters": "Design beautiful emails with our template editor and personalization.",
+                  "style": { "fontFamily": "Inter", "fontWeight": 400, "fontSize": 14 },
+                  "fills": [{ "type": "SOLID", "color": "#666666" }]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "CTA Section",
+          "type": "RECTANGLE",
+          "x": 0, "y": 540, "width": 600, "height": 150,
+          "fills": [{ "type": "SOLID", "color": "#215CE5" }],
+          "children": [
+            { "name": "CTA Title", "type": "TEXT", "x": 60, "y": 32, "width": 480, "height": 32,
+              "characters": "Ready to get started?",
+              "style": { "fontFamily": "Inter", "fontWeight": 700, "fontSize": 22, "textAlignHorizontal": "CENTER" },
+              "fills": [{ "type": "SOLID", "color": "#FFFFFF" }]
+            },
+            {
+              "name": "Button Background", "type": "RECTANGLE",
+              "x": 210, "y": 80, "width": 180, "height": 44,
+              "cornerRadius": 22,
+              "fills": [{ "type": "SOLID", "color": "#FFFFFF" }],
+              "children": [
+                { "name": "Button Text", "type": "TEXT", "x": 30, "y": 10, "width": 120, "height": 24,
+                  "characters": "Explore Features",
+                  "style": { "fontFamily": "Inter", "fontWeight": 600, "fontSize": 16, "textAlignHorizontal": "CENTER" },
+                  "fills": [{ "type": "SOLID", "color": "#215CE5" }]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Footer",
+          "type": "RECTANGLE",
+          "x": 0, "y": 690, "width": 600, "height": 80,
+          "fills": [{ "type": "SOLID", "color": "#F0F0F0" }],
+          "children": [
+            { "name": "Footer Text", "type": "TEXT", "x": 120, "y": 30, "width": 360, "height": 20,
+              "characters": "Sent with Campaign Lite  |  Unsubscribe",
+              "style": { "fontFamily": "Inter", "fontWeight": 400, "fontSize": 12, "textAlignHorizontal": "CENTER" },
+              "fills": [{ "type": "SOLID", "color": "#999999" }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
