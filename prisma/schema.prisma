@@ -40,7 +40,11 @@ model User {
   email          String       @unique
   emailVerified  DateTime?
   image          String?
-  role           String       @default("admin") // admin | manager
+  role           String       @default("user") // admin | manager | user
+  password       String?      // bcrypt hash
+  approved       Boolean      @default(false)
+  approvedAt     DateTime?
+  approvedBy     String?      // email of who approved
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id])
   createdAt      DateTime     @default(now())

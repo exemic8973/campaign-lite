@@ -1,31 +1,85 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
+import bcrypt from "bcryptjs";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { prisma } from "./db";
 
+async function sendApprovalNotification(newUserEmail: string, org: { id: string; name: string }) {
+  const admin = await prisma.user.findFirst({
+    where: { organizationId: org.id, role: "admin", approved: true },
+  });
+  if (!admin?.email) return;
+  const baseUrl = process.env.AUTH_URL || "http://localhost:3000";
+  const approvalUrl = `${baseUrl}/api/approve?orgId=${org.id}&email=${encodeURIComponent(newUserEmail)}`;
+  try {
+    const { sendCampaignEmail, loadSmtpConfig } = await import("./email");
+    const smtp = await loadSmtpConfig(org.id);
+    await sendCampaignEmail({
+      to: [admin.email],
+      subject: `[Campaign Lite] New user "${newUserEmail}" needs approval`,
+      html: `<p>A new user <strong>${newUserEmail}</strong> has signed up for <strong>${org.name}</strong>.</p><p><a href="${approvalUrl}" style="display:inline-block;background:#215CE5;color:#fff;padding:12px 24px;border-radius:24px;text-decoration:none;font-weight:600;">Click here to approve</a></p>`,
+      fromName: "Campaign Lite",
+      fromEmail: smtp?.fromEmail || process.env.RESEND_FROM_EMAIL || "noreply@campaignlite.dev",
+      campaignId: "approval",
+      smtp,
+    });
+  } catch { /* best-effort */ }
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
-  session: {
-    strategy: "jwt",
-  },
+  session: { strategy: "jwt" },
   providers: [
     Google,
-    // Dev login: only available outside production
+    Credentials({
+      id: "signup",
+      name: "Sign Up",
+        credentials: {
+          email: { label: "Email", type: "email" },
+          password: { label: "Password", type: "password" },
+          name: { label: "Name", type: "text" },
+          orgName: { label: "Organization", type: "text" },
+        },
+        async authorize(credentials) {
+          if (!credentials?.email || !credentials?.password) return null;
+          const email = credentials.email as string;
+          const existing = await prisma.user.findUnique({ where: { email } });
+          if (existing) throw new Error("Email already registered");
+
+          const hash = await bcrypt.hash(credentials.password as string, 12);
+          const orgName = (credentials.orgName as string) || email.split("@")[0];
+          const org = await prisma.organization.create({
+            data: {
+              name: orgName,
+              slug: orgName.toLowerCase().replace(/[^a-z0-9]/g, "-") + "-" + Date.now(),
+            },
+          });
+          const existingApproved = await prisma.user.findFirst({
+            where: { organizationId: org.id, approved: true },
+          });
+          const user = await prisma.user.create({
+            data: {
+              email, name: (credentials.name as string) || email.split("@")[0],
+              password: hash, organizationId: org.id, role: "admin",
+              approved: !existingApproved,
+            },
+          });
+          if (!user.approved) {
+            sendApprovalNotification(email, org).catch(() => {});
+            throw new Error("Account created. Awaiting admin approval.");
+          }
+          return { id: user.id, email: user.email, name: user.name };
+        },
+      }),
     ...(process.env.NODE_ENV !== "production" ? [Credentials({
       id: "dev",
       name: "Dev Login",
-      credentials: {
-        email: { label: "Email", type: "email" },
-      },
+      credentials: { email: { label: "Email", type: "email" } },
       async authorize(credentials) {
         if (!credentials?.email) return null;
         const email = credentials.email as string;
-
-        let user = await prisma.user.findUnique({
-          where: { email },
-        });
-
+        let user = await prisma.user.findUnique({ where: { email } });
         if (!user) {
           const org = await prisma.organization.create({
             data: {
@@ -33,42 +87,45 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
               slug: email.split("@")[0].toLowerCase().replace(/[^a-z0-9]/g, "-"),
             },
           });
-
           user = await prisma.user.create({
-            data: {
-              email,
-              name: email.split("@")[0],
-              organizationId: org.id,
-            },
+            data: { email, name: email.split("@")[0], organizationId: org.id, role: "admin", approved: true },
           });
         }
-
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name,
-        };
+        return { id: user.id, email: user.email, name: user.name };
       },
     })] : []),
   ],
   callbacks: {
     async jwt({ token, user }) {
-      // Set user.id on first sign-in for ALL providers
-      if (user?.id) {
-        token.id = user.id;
+      if (user?.id) token.id = user.id;
+      if (user?.email) {
+        const dbUser = await prisma.user.findUnique({ where: { email: user.email }, select: { role: true, approved: true } });
+        if (dbUser) { token.role = dbUser.role; token.approved = dbUser.approved; }
       }
       return token;
     },
     async session({ session, token }) {
-      if (token && session.user) {
+      if (session.user) {
         session.user.id = token.id as string;
-        session.user.name = token.name as string;
-        session.user.email = token.email as string;
+        (session.user as any).role = token.role || "user";
+        (session.user as any).approved = token.approved ?? true;
       }
       return session;
     },
   },
-  pages: {
-    signIn: "/auth/login",
-  },
+  pages: { signIn: "/auth/login", error: "/auth/login" },
 });
+
+// RBAC helpers
+export type UserRole = "admin" | "manager" | "user";
+
+export const PERMISSIONS: Record<string, string[]> = {
+  admin: ["*"],
+  manager: ["dashboard", "campaigns", "contacts", "segments", "templates", "workflows", "settings"],
+  user: ["dashboard", "contacts", "segments"],
+};
+
+export function canAccess(role: string, resource: string): boolean {
+  const perms = PERMISSIONS[role] || PERMISSIONS.user;
+  return perms.includes("*") || perms.includes(resource);
+}

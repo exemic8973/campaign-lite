@@ -12,7 +12,7 @@ test.describe("Campaign Lite - Smoke Tests", () => {
 
   test("login page loads", async ({ page }) => {
     await page.goto("/auth/login");
-    await expect(page.locator("body")).toContainText("Choose your sign-in method");
+    await expect(page.locator("body")).toContainText("Welcome to Campaign Lite");
   });
 
   test("can login and see dashboard", async ({ page }) => {
