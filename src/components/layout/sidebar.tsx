@@ -13,19 +13,23 @@ import {
   LogOut,
   Workflow,
 } from "lucide-react";
+import { useSession } from "@/hooks/use-session";
+import { canAccess } from "@/lib/rbac";
 
 const navItems = [
-  { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
-  { href: "/contacts", label: "Contacts", icon: Users },
-  { href: "/segments", label: "Segments", icon: Layers },
-  { href: "/campaigns", label: "Campaigns", icon: Megaphone },
-  { href: "/templates", label: "Templates", icon: FileText },
-  { href: "/workflows", label: "Workflows", icon: Workflow },
-  { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/dashboard", label: "Dashboard", icon: BarChart3, resource: "dashboard" },
+  { href: "/contacts", label: "Contacts", icon: Users, resource: "contacts" },
+  { href: "/segments", label: "Segments", icon: Layers, resource: "segments" },
+  { href: "/campaigns", label: "Campaigns", icon: Megaphone, resource: "campaigns" },
+  { href: "/templates", label: "Templates", icon: FileText, resource: "templates" },
+  { href: "/workflows", label: "Workflows", icon: Workflow, resource: "workflows" },
+  { href: "/settings", label: "Settings", icon: Settings, resource: "settings" },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { data: session } = useSession();
+  const role = (session?.user as any)?.role || "user";
 
   return (
     <aside className="flex h-full w-60 flex-col border-r bg-background">
@@ -39,7 +43,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 space-y-1 p-3">
-        {navItems.map((item) => {
+        {navItems.filter(item => canAccess(role, item.resource)).map((item) => {
           const Icon = item.icon;
           const isActive = pathname.startsWith(item.href);
           return (

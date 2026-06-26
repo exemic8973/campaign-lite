@@ -116,16 +116,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   pages: { signIn: "/auth/login", error: "/auth/login" },
 });
 
-// RBAC helpers
-export type UserRole = "admin" | "manager" | "user";
-
-export const PERMISSIONS: Record<string, string[]> = {
-  admin: ["*"],
-  manager: ["dashboard", "campaigns", "contacts", "segments", "templates", "workflows", "settings"],
-  user: ["dashboard", "contacts", "segments"],
-};
-
-export function canAccess(role: string, resource: string): boolean {
-  const perms = PERMISSIONS[role] || PERMISSIONS.user;
-  return perms.includes("*") || perms.includes(resource);
-}
+// RBAC helpers — re-exported from rbac.ts for backward compat
+export type { UserRole } from "./rbac";
+export { PERMISSIONS, canAccess } from "./rbac";
