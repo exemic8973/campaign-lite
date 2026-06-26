@@ -42,3 +42,4 @@ prisma/email-templates/
 
 # playwright
 test-results/
+playwright-report/
