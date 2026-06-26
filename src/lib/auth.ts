@@ -11,7 +11,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   },
   providers: [
     Google,
-    Credentials({
+    // Dev login: only available outside production
+    ...(process.env.NODE_ENV !== "production" ? [Credentials({
       id: "dev",
       name: "Dev Login",
       credentials: {
@@ -48,17 +49,13 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           name: user.name,
         };
       },
-    }),
+    })] : []),
   ],
   callbacks: {
-    async jwt({ token, user, account }) {
-      // Initial sign in
-      if (account && user) {
-        return {
-          ...token,
-          id: user.id,
-          accessToken: account.access_token,
-        };
+    async jwt({ token, user }) {
+      // Set user.id on first sign-in for ALL providers
+      if (user?.id) {
+        token.id = user.id;
       }
       return token;
     },

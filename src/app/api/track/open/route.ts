@@ -1,40 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { verifyLink } from "@/lib/link-signing";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const campaignId = searchParams.get("campaignId");
-  const contactId = searchParams.get("contactId");
+  const token = searchParams.get("token");
 
-  if (campaignId) {
-    // Record open event (fire and forget)
-    prisma.campaignEvent
-      .create({
-        data: {
-          type: "open",
-          campaignId,
-          contactId: contactId || undefined,
-        },
-      })
-      .catch(() => {});
+  if (token) {
+    const payload = verifyLink(token);
+    if (!payload || payload.purpose !== "track") {
+      // Return transparent pixel anyway to avoid broken images
+      const gif = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
+      return new NextResponse(gif, { headers: { "Content-Type": "image/gif", "Cache-Control": "no-cache" } });
+    }
 
-    // Update campaign open count
-    prisma.campaign
-      .update({
-        where: { id: campaignId },
-        data: { openCount: { increment: 1 } },
-      })
-      .catch(() => {});
+    // Record open event (idempotent via campaignId+contactId+type)
+    prisma.campaignEvent.create({
+      data: { type: "open", campaignId: payload.campaignId, contactId: payload.contactId, metadata: { via: "signed_link" } },
+    }).catch(() => {});
+
+    prisma.campaign.update({ where: { id: payload.campaignId }, data: { openCount: { increment: 1 } } }).catch(() => {});
+  } else {
+    // Legacy support for old tracking pixels (without token)
+    const campaignId = searchParams.get("campaignId");
+    const contactId = searchParams.get("contactId");
+    if (campaignId) {
+      prisma.campaignEvent.create({ data: { type: "open", campaignId, contactId: contactId || undefined } }).catch(() => {});
+      prisma.campaign.update({ where: { id: campaignId }, data: { openCount: { increment: 1 } } }).catch(() => {});
+    }
   }
 
-  // Return a transparent 1x1 GIF
   const gif = Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64");
-  return new NextResponse(gif, {
-    headers: {
-      "Content-Type": "image/gif",
-      "Cache-Control": "no-cache, no-store, must-revalidate",
-      "Pragma": "no-cache",
-      "Expires": "0",
-    },
-  });
+  return new NextResponse(gif, { headers: { "Content-Type": "image/gif", "Cache-Control": "no-cache" } });
 }

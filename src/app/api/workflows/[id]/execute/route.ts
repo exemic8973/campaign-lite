@@ -9,8 +9,13 @@ export async function POST(
 ) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
   const { id } = await params;
+  const { requireOrg } = await import("@/lib/session-utils");
+  const orgId = await requireOrg(session);
+
+  // Verify ownership before executing
+  const existing = await prisma.workflow.findFirst({ where: { id, organizationId: orgId } });
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   try {
     const execution = await executeWorkflow(id);

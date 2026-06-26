@@ -30,9 +30,9 @@ export async function POST(
   let contacts: SendContact[];
   // Load SMTP config if available
   const { loadSmtpConfig } = await import("@/lib/email");
-  const smtpInfo = await loadSmtpConfig(campaign.organizationId);
-  const senderFrom = smtpInfo?.fromEmail || campaign.fromEmail || process.env.RESEND_FROM_EMAIL || "noreply@campaignlite.dev";
-  const senderName = smtpInfo?.fromName || campaign.fromName || "Campaign Lite";
+  const smtpConfig = await loadSmtpConfig(campaign.organizationId);
+  const senderFrom = smtpConfig?.fromEmail || campaign.fromEmail || process.env.RESEND_FROM_EMAIL || "noreply@campaignlite.dev";
+  const senderName = smtpConfig?.fromName || campaign.fromName || "Campaign Lite";
 
   if (campaign.segmentId) {
     // Evaluate segment rules to find matching contacts
@@ -107,10 +107,11 @@ export async function POST(
           to: [contact.email!],
           subject: personalizedSubject,
           html: personalizedHtml,
-          fromName: campaign.fromName || undefined,
-          fromEmail: campaign.fromEmail || undefined,
+          fromName: senderName,
+          fromEmail: senderFrom,
           campaignId: campaign.id,
           trackingPixel,
+          smtp: smtpConfig,
         });
 
         // Record sent event

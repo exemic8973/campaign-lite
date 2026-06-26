@@ -1,11 +1,14 @@
 import nodemailer from "nodemailer";
 import { Resend } from "resend";
+import { decrypt } from "./encryption";
 
 function getResend() {
   const key = process.env.RESEND_API_KEY;
   if (!key) throw new Error("RESEND_API_KEY is not configured");
   return new Resend(key);
 }
+
+interface SmtpConfig { host: string; port: number; user: string; pass: string; fromEmail?: string | null; fromName?: string | null; }
 
 interface SendCampaignOptions {
   to: string[];
@@ -16,27 +19,29 @@ interface SendCampaignOptions {
   replyTo?: string;
   campaignId: string;
   trackingPixel?: string;
+  smtp?: SmtpConfig | null;
 }
 
-// Cached SMTP config (loaded once per send)
-let smtpConfig: { host: string; port: number; user: string; pass: string } | null = null;
-
-export async function loadSmtpConfig(orgId: string) {
+/**
+ * Load SMTP config for a specific organization.
+ * Returns null if no SMTP is configured. No module-level state.
+ */
+export async function loadSmtpConfig(orgId: string): Promise<SmtpConfig | null> {
   const { prisma } = await import("./db");
   const org = await prisma.organization.findUnique({
     where: { id: orgId },
     select: { smtpHost: true, smtpPort: true, smtpUser: true, smtpPass: true, smtpFromEmail: true, smtpFromName: true },
   });
   if (org?.smtpHost && org?.smtpUser) {
-    smtpConfig = {
+    return {
       host: org.smtpHost,
       port: org.smtpPort || 587,
       user: org.smtpUser,
-      pass: org.smtpPass || "",
+      pass: org.smtpPass ? (decrypt(org.smtpPass) || org.smtpPass) : "",
+      fromEmail: org.smtpFromEmail,
+      fromName: org.smtpFromName,
     };
-    return { fromEmail: org.smtpFromEmail, fromName: org.smtpFromName };
   }
-  smtpConfig = null;
   return null;
 }
 
@@ -49,31 +54,32 @@ export async function sendCampaignEmail({
   replyTo,
   campaignId,
   trackingPixel,
+  smtp,
 }: SendCampaignOptions) {
   let finalHtml = html;
   if (trackingPixel) {
     finalHtml = html.replace("</body>", `<img src="${trackingPixel}" width="1" height="1" alt="" style="display:none;" /></body>`);
   }
 
-  // Try SMTP first
-  if (smtpConfig) {
+  // SMTP: build a fresh transporter per send
+  if (smtp) {
     const transporter = nodemailer.createTransport({
-      host: smtpConfig.host,
-      port: smtpConfig.port,
-      secure: smtpConfig.port === 465,
-      auth: { user: smtpConfig.user, pass: smtpConfig.pass },
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.port === 465,
+      auth: { user: smtp.user, pass: smtp.pass },
     });
     await transporter.sendMail({
-      from: `"${fromName}" <${fromEmail}>`,
+      from: `"${smtp.fromName || fromName}" <${smtp.fromEmail || fromEmail}>`,
       to: to.join(","),
       subject,
       html: finalHtml,
-      replyTo: replyTo || fromEmail,
+      replyTo: replyTo || smtp.fromEmail || fromEmail,
     });
     return { id: `smtp_${Date.now()}` };
   }
 
-  // Fall back to Resend
+  // Resend fallback
   if (process.env.RESEND_API_KEY) {
     const { data, error } = await getResend().emails.send({
       from: `${fromName} <${fromEmail}>`,

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOrgId } from "@/lib/session-utils";
+import { encrypt, decrypt } from "@/lib/encryption";
 
 export async function GET() {
   const session = await auth();
@@ -42,7 +43,7 @@ export async function PUT(request: Request) {
     smtpFromName: body.fromName || null,
   };
   if (body.pass && body.pass !== "••••••••") {
-    data.smtpPass = body.pass;
+    data.smtpPass = encrypt(body.pass);
   }
 
   await prisma.organization.update({ where: { id: orgId }, data });
