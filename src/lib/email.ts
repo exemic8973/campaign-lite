@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
 import { Resend } from "resend";
 import { decrypt } from "./encryption";
+import Handlebars from "handlebars";
 
 function getResend() {
   const key = process.env.RESEND_API_KEY;
@@ -98,10 +99,22 @@ export async function sendCampaignEmail({
   return { id: `sim_${Date.now()}` };
 }
 
+/**
+ * Render a Handlebars template with HTML-escaping.
+ * Falls back to simple regex replacement if Handlebars fails.
+ */
 export function replaceVariables(html: string, variables: Record<string, string>): string {
-  let result = html;
-  for (const [key, value] of Object.entries(variables)) {
-    result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value || "");
+  try {
+    const template = Handlebars.compile(html, { noEscape: false });
+    return template(variables);
+  } catch {
+    // Fallback: simple regex replacement if template is malformed
+    let result = html;
+    for (const [key, value] of Object.entries(variables)) {
+      // Escape HTML entities in the value
+      const escaped = String(value || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), escaped);
+    }
+    return result;
   }
-  return result;
 }
