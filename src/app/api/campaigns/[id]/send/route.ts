@@ -43,7 +43,9 @@ export async function POST(
       if (rules.conditions?.length) {
         const op = rules.logic === "or" ? "OR" : "AND";
         where[op] = rules.conditions.map((cond: any) => {
+          const allowedFields = new Set(["email", "phone", "firstName", "lastName", "tags", "isSubscribed", "createdAt", "source"]);
           const { field, operator, value } = cond;
+          if (!allowedFields.has(field)) return { id: "" };
           if (operator === "has") return { tags: { contains: value } };
           if (operator === "notHas") return { tags: { not: { contains: value } } };
           if (operator === "equals") return { [field]: value === "true" ? true : value === "false" ? false : value };

@@ -3,6 +3,9 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOrgId } from "@/lib/session-utils";
 
+// Allowed fields for segment conditions (prevent arbitrary column access)
+const ALLOWED_FIELDS = new Set(["email", "phone", "firstName", "lastName", "tags", "isSubscribed", "createdAt", "source"]);
+
 // Evaluate segment rules and return matching contact count
 async function evaluateSegmentCount(orgId: string, rules: any): Promise<number> {
   if (!rules?.conditions?.length) return 0;
@@ -12,6 +15,11 @@ async function evaluateSegmentCount(orgId: string, rules: any): Promise<number> 
   const ops = rules.logic === "or" ? "OR" : "AND";
   where[ops] = rules.conditions.map((cond: any) => {
     const { field, operator, value } = cond;
+    // Reject unknown fields
+    if (!ALLOWED_FIELDS.has(field)) {
+      // Return a condition that matches nothing
+      return { id: "" };
+    }
     switch (operator) {
       case "contains":
         return { [field]: { contains: value } };
