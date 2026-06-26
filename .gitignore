@@ -39,3 +39,6 @@ prisma/email-templates/
 
 # reasonix
 .reasonix/
+
+# playwright
+test-results/
