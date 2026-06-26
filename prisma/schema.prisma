@@ -3,12 +3,12 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// Note: SQLite doesn't support enums or arrays natively.
-// Tags stored as JSON string in SQLite. Use Postgres for production.
+// Enums kept as String for backward compatibility with existing code.
+// Migrate to native Prisma enums in a future iteration.
 
 model Organization {
   id        String   @id @default(cuid())
@@ -92,8 +92,8 @@ model Contact {
   firstName      String?
   lastName       String?
   customFields   Json?    // JSON object for custom field values
-  tags           String @default("[]") // JSON array of tag strings
-  source         String?  // "import" | "manual" | "api"
+  tags           String[]
+  source         String?
   isSubscribed   Boolean  @default(true)
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
@@ -139,8 +139,8 @@ model Template {
   name           String
   description    String?
   subject        String?  // Default subject line
-  bodyHtml       String
-  variables      String @default("[]") // JSON array of variable names
+  bodyHtml       String   @db.Text
+  variables      String[]
   previewText    String?
   category       String   @default("marketing") // marketing | transactional
   organizationId String
@@ -155,7 +155,7 @@ model Campaign {
   id             String   @id @default(cuid())
   name           String
   type           String   @default("email") // email | sms
-  status         String   @default("draft") // draft | scheduled | sending | sent | cancelled
+  status         String   @default("draft")
   scheduledAt    DateTime?
   sentAt         DateTime?
   subject        String?
@@ -220,7 +220,7 @@ model Workflow {
   id             String   @id @default(cuid())
   name           String
   description    String?
-  status         String   @default("draft") // draft | active | paused
+  status         String   @default("draft")
   triggerType    String   @default("manual") // manual | scheduled | webhook
   triggerConfig  String?  // JSON: { cron?, webhookUrl?, segmentId? }
   organizationId String
@@ -239,7 +239,7 @@ model WorkflowNode {
   id         String @id @default(cuid())
   workflowId String
   workflow   Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  type       String  // trigger | sendEmail | delay | condition | updateContact | webhook | end
+  type       String
   label      String?
   config     String  // JSON: node configuration (templateId, duration, field, value, etc.)
   positionX  Float   @default(0)
@@ -270,7 +270,7 @@ model WorkflowExecution {
   workflow        Workflow @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   contactId       String?
   contact         Contact? @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  status          String   @default("pending") // pending | running | completed | failed
+  status          String   @default("pending")
   currentNodeId   String?
   currentStep     Int      @default(0)
   totalSteps      Int      @default(0)

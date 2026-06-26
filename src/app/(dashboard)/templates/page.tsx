@@ -34,6 +34,7 @@ export default async function TemplatesPage() {
   const serialized = templates.map((t) => ({
     ...t,
     createdAt: t.createdAt.toISOString(),
+    variables: JSON.stringify(t.variables || []),
   }));
 
   return (

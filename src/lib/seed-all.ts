@@ -33,7 +33,7 @@ export async function seedAll(organizationId: string) {
 </div>
 <p style="text-align:center;color:#999;font-size:12px;">You're receiving this because you signed up. <a href="{{unsubscribeUrl}}" style="color:#999;">Unsubscribe</a></p>
 </div></body></html>`,
-        variables: JSON.stringify(["firstName", "lastName", "email", "unsubscribeUrl"]),
+        variables: ["firstName", "lastName", "email", "unsubscribeUrl"],
         category: "marketing",
         organizationId,
       },
@@ -63,7 +63,7 @@ export async function seedAll(organizationId: string) {
 <a href="{{unsubscribeUrl}}" style="color:#999;font-size:12px;">Unsubscribe</a>
 </div>
 </div></body></html>`,
-        variables: JSON.stringify(["firstName", "month", "unsubscribeUrl"]),
+        variables: ["firstName", "month", "unsubscribeUrl"],
         category: "marketing",
         organizationId,
       },
@@ -83,7 +83,7 @@ export async function seedAll(organizationId: string) {
         description: "Designed in Figma and auto-converted to responsive email HTML",
         subject: "Your monthly update is here!",
         bodyHtml: html,
-        variables: JSON.stringify(["firstName", "unsubscribeUrl"]),
+        variables: ["firstName", "unsubscribeUrl"],
         category: "marketing",
         organizationId,
       },
@@ -96,14 +96,14 @@ export async function seedAll(organizationId: string) {
   if (!existingContacts) {
     const contacts = await prisma.contact.createMany({
       data: [
-        { email: "sarah.chen@example.com", firstName: "Sarah", lastName: "Chen", phone: "+1 (415) 555-0101", tags: JSON.stringify(["vip", "newsletter"]), source: "import", organizationId },
-        { email: "james.wilson@example.com", firstName: "James", lastName: "Wilson", phone: "+1 (212) 555-0202", tags: JSON.stringify(["newsletter"]), source: "import", organizationId },
-        { email: "maria.garcia@example.com", firstName: "Maria", lastName: "Garcia", phone: "+34 91 555 0303", tags: JSON.stringify(["vip", "premium"]), source: "manual", organizationId },
-        { email: "alex.kim@example.com", firstName: "Alex", lastName: "Kim", phone: "+82 2-555-0404", tags: JSON.stringify(["trial", "newsletter"]), source: "import", organizationId },
-        { email: "emma.thompson@example.com", firstName: "Emma", lastName: "Thompson", phone: "+44 20 7555 0505", tags: JSON.stringify(["premium"]), source: "manual", organizationId },
-        { email: "david.park@example.com", firstName: "David", lastName: "Park", phone: "+1 (312) 555-0606", tags: JSON.stringify(["vip"]), source: "import", organizationId },
-        { email: "lisa.martinez@example.com", firstName: "Lisa", lastName: "Martinez", phone: "+52 55 5555 0707", tags: JSON.stringify(["newsletter", "trial"]), source: "import", organizationId, isSubscribed: false },
-        { email: "tom.brown@example.com", firstName: "Tom", lastName: "Brown", phone: "+1 (617) 555-0808", tags: JSON.stringify([]), source: "manual", organizationId },
+        { email: "sarah.chen@example.com", firstName: "Sarah", lastName: "Chen", phone: "+1 (415) 555-0101", tags: ["vip", "newsletter"], source: "import", organizationId },
+        { email: "james.wilson@example.com", firstName: "James", lastName: "Wilson", phone: "+1 (212) 555-0202", tags: ["newsletter"], source: "import", organizationId },
+        { email: "maria.garcia@example.com", firstName: "Maria", lastName: "Garcia", phone: "+34 91 555 0303", tags: ["vip", "premium"], source: "manual", organizationId },
+        { email: "alex.kim@example.com", firstName: "Alex", lastName: "Kim", phone: "+82 2-555-0404", tags: ["trial", "newsletter"], source: "import", organizationId },
+        { email: "emma.thompson@example.com", firstName: "Emma", lastName: "Thompson", phone: "+44 20 7555 0505", tags: ["premium"], source: "manual", organizationId },
+        { email: "david.park@example.com", firstName: "David", lastName: "Park", phone: "+1 (312) 555-0606", tags: ["vip"], source: "import", organizationId },
+        { email: "lisa.martinez@example.com", firstName: "Lisa", lastName: "Martinez", phone: "+52 55 5555 0707", tags: ["newsletter", "trial"], source: "import", organizationId, isSubscribed: false },
+        { email: "tom.brown@example.com", firstName: "Tom", lastName: "Brown", phone: "+1 (617) 555-0808", tags: [], source: "manual", organizationId },
       ],
     });
     results.contactsImported = contacts.count;

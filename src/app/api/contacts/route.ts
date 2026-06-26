@@ -36,7 +36,9 @@ export async function GET(request: NextRequest) {
     prisma.contact.count({ where }),
   ]);
 
-  return NextResponse.json({ contacts, total, page, limit });
+  // Serialize tags arrays as JSON strings for backward compat
+  const serialized = contacts.map(c => ({ ...c, tags: JSON.stringify(c.tags || []) }));
+  return NextResponse.json({ contacts: serialized, total, page, limit });
 }
 
 export async function POST(request: NextRequest) {
@@ -62,8 +64,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ imported: result.count });
   }
 
-  // Handle single contact - tags may already be JSON string from client
-  const tags = typeof body.tags === "string" ? body.tags : JSON.stringify(body.tags || []);
+  // Handle single contact - tags is now a native array
+  const tags: string[] = Array.isArray(body.tags) ? body.tags : (typeof body.tags === "string" ? JSON.parse(body.tags || "[]") : []);
   const contact = await prisma.contact.create({
     data: {
       email: body.email || null,
@@ -87,7 +89,7 @@ export async function PUT(request: NextRequest) {
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const body = await request.json();
-  const tags = typeof body.tags === "string" ? body.tags : JSON.stringify(body.tags || []);
+  const tags: string[] = Array.isArray(body.tags) ? body.tags : (typeof body.tags === "string" ? JSON.parse(body.tags || "[]") : []);
 
   const contact = await prisma.contact.update({
     where: { id },

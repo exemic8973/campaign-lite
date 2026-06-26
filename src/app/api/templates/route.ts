@@ -14,10 +14,12 @@ export async function GET() {
     where: { organizationId: orgId },
     orderBy: { createdAt: "desc" },
     select: {
-      id: true, name: true, description: true, subject: true, category: true, createdAt: true,
+      id: true, name: true, description: true, subject: true, category: true, createdAt: true, variables: true,
     },
   });
-  return NextResponse.json(templates);
+  // Serialize arrays for backward compat
+  const serialized = templates.map(t => ({ ...t, variables: JSON.stringify(t.variables || []) }));
+  return NextResponse.json(serialized);
 }
 
 function extractVariables(bodyHtml: string): string[] {
@@ -42,13 +44,13 @@ export async function POST(request: NextRequest) {
       description: body.description || null,
       subject: body.subject || null,
       bodyHtml: body.bodyHtml || "",
-      variables: JSON.stringify(variables),
+      variables,
       previewText: body.previewText || null,
       category: body.category || "marketing",
       organizationId: orgId,
     },
   });
-  return NextResponse.json(template);
+  return NextResponse.json({ ...template, variables: JSON.stringify(template.variables || []) });
 }
 
 export async function PUT(request: NextRequest) {
@@ -65,11 +67,11 @@ export async function PUT(request: NextRequest) {
     where: { id },
     data: {
       name: body.name, description: body.description, subject: body.subject,
-      bodyHtml: body.bodyHtml, variables: JSON.stringify(variables),
+      bodyHtml: body.bodyHtml, variables,
       previewText: body.previewText, category: body.category,
     },
   });
-  return NextResponse.json(template);
+  return NextResponse.json({ ...template, variables: JSON.stringify(template.variables || []) });
 }
 
 export async function DELETE(request: NextRequest) {

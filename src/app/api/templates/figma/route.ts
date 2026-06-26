@@ -118,7 +118,7 @@ export async function POST(request: Request) {
       description: body.demo ? "Auto-generated from Figma demo." : `Imported from Figma file ${body.fileKey}`,
       subject: subject.substring(0, 100),
       bodyHtml: html,
-      variables: JSON.stringify([]),
+      variables: [],
       category: "marketing",
       organizationId: orgId,
     },

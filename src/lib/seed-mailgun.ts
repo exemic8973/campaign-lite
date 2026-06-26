@@ -38,7 +38,7 @@ export async function seedMailgunTemplates(organizationId: string) {
         description: f.desc,
         subject: f.subject,
         bodyHtml,
-        variables: JSON.stringify(["firstName", "unsubscribeUrl"]),
+        variables: ["firstName", "unsubscribeUrl"],
         category: "transactional",
         organizationId,
       },
