@@ -4,6 +4,11 @@ import { prisma } from "@/lib/db";
 // Resend webhook receiver for bounces, complaints, and deliveries
 // Configure in Resend Dashboard → Webhooks → POST to /api/webhooks/email
 export async function POST(request: NextRequest) {
+  // Rate limit: 60 req/min per IP
+  const ip = request.headers.get("x-forwarded-for") || "unknown";
+  const { allowed } = (await import("@/lib/rate-limit")).rateLimit(`webhook:${ip}`, { maxRequests: 60, windowMs: 60000 });
+  if (!allowed) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+
   const body = await request.json();
   const { type, data } = body;
 

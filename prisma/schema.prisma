@@ -187,6 +187,20 @@ model Campaign {
   events CampaignEvent[]
 }
 
+model AuditLog {
+  id           String   @id @default(cuid())
+  organizationId String?
+  userId       String?
+  action       String   // "create" | "update" | "delete" | "send" | "unsusbscribe"
+  resource     String   // "contact" | "campaign" | "template" | "segment" | "workflow"
+  resourceId   String?
+  metadata     String?  // JSON stringified details
+  ipAddress    String?
+  createdAt    DateTime @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
 model CampaignEvent {
   id         String   @id @default(cuid())
   type       String   // sent | open | click | bounce | unsubscribe | complaint
