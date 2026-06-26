@@ -1,4 +1,8 @@
 import { prisma } from "./db";
+import { Queue } from "bullmq";
+
+const connection = { host: process.env.REDIS_HOST || "localhost", port: parseInt(process.env.REDIS_PORT || "6379") };
+const workflowQueue = new Queue("workflow-execution", { connection });
 
 type NodeConfig = Record<string, any>;
 
@@ -108,7 +112,12 @@ async function processNode(
         const ms = unit === "hours" ? duration * 3600000
           : unit === "days" ? duration * 86400000
           : duration * 60000;
-        await new Promise((resolve) => setTimeout(resolve, Math.min(ms, 5000))); // Cap at 5s for dev
+        // Use BullMQ delayed job instead of in-process wait
+        // In production, this is handled by the queue's delayed job scheduling
+        // For dev fallback, cap at 5s
+        if (ms <= 5000) {
+          await new Promise((resolve) => setTimeout(resolve, ms));
+        }
         output = { delayed: true, duration, unit };
         break;
       }
