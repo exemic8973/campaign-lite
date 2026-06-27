@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -15,16 +15,28 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [isDev, setIsDev] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    // Check if we're in dev mode (dev provider exists)
+    setIsDev(window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+  }, []);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
+
+    // In dev mode, use passwordless login. In production, use password.
+    const provider = isDev ? "dev" : "login";
+    const params: Record<string, string> = { email, redirect: "false" };
+    if (!isDev) params.password = password;
+
     try {
-      const result = await signIn("dev", { email, redirect: false });
+      const result = await signIn(provider, params);
       if (result?.error) {
-        setError(result.error);
+        setError(result.error === "CredentialsSignin" ? "Invalid email or password" : result.error);
       } else {
         router.push("/dashboard");
       }
@@ -50,12 +62,18 @@ export default function LoginPage() {
             <Chrome className="h-5 w-5" />
             Continue with Google
           </Button>
-          <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">dev</span></div></div>
+          <div className="relative"><div className="absolute inset-0 flex items-center"><span className="w-full border-t" /></div><div className="relative flex justify-center text-xs uppercase"><span className="bg-card px-2 text-muted-foreground">or</span></div></div>
           <form onSubmit={handleEmailLogin} className="space-y-3">
             <div className="space-y-2">
-              <Label htmlFor="email">Email (dev login)</Label>
+              <Label htmlFor="email">Email</Label>
               <Input id="email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required />
             </div>
+            {!isDev && (
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required />
+              </div>
+            )}
             {error && <p className="text-xs text-destructive">{error}</p>}
             <Button type="submit" className="w-full gap-2" disabled={loading}>
               <LogIn className="h-5 w-5" />
@@ -64,9 +82,6 @@ export default function LoginPage() {
           </form>
           <p className="text-xs text-center text-muted-foreground">
             New to Campaign Lite? <Link href="/auth/signup" className="text-primary hover:underline">Create an account</Link>
-          </p>
-          <p className="text-xs text-center text-muted-foreground">
-            Enter any email to create an account instantly. No password needed.
           </p>
         </CardContent>
       </Card>

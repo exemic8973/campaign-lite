@@ -72,6 +72,26 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           return { id: user.id, email: user.email, name: user.name };
         },
       }),
+    // Password-based login for existing users (always available)
+    Credentials({
+      id: "login",
+      name: "Sign In",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) return null;
+        const email = credentials.email as string;
+        const user = await prisma.user.findUnique({ where: { email } });
+        if (!user?.password) return null;
+        const valid = await bcrypt.compare(credentials.password as string, user.password);
+        if (!valid) return null;
+        if (!user.approved) throw new Error("Account awaiting admin approval");
+        return { id: user.id, email: user.email, name: user.name };
+      },
+    }),
+    // Dev login (email only, no password) — only in development
     ...(process.env.NODE_ENV !== "production" ? [Credentials({
       id: "dev",
       name: "Dev Login",
