@@ -156,7 +156,7 @@ export function SegmentsClient({ initialSegments }: { initialSegments: Segment[]
       await fetch(`/api/segments/members?segmentId=${membersSegId}&contactId=${contactId}`, { method: "DELETE" });
     }
     const next = new Set(memberIds);
-    add ? next.add(contactId) : next.delete(contactId);
+    if (add) { next.add(contactId); } else { next.delete(contactId); }
     setMemberIds(next);
   };
 
