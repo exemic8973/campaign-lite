@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOrgId } from "@/lib/session-utils";
+import { decrypt } from "@/lib/encryption";
 
 export async function POST(request: Request) {
   const session = await auth();
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
   if (!body.fileKey) return NextResponse.json({ error: "Missing fileKey" }, { status: 400 });
 
   const org = await prisma.organization.findUnique({ where: { id: orgId } });
-  const token = org?.figmaToken || process.env.FIGMA_ACCESS_TOKEN;
+  const token = (org?.figmaToken ? (decrypt(org.figmaToken) || org.figmaToken) : null) || process.env.FIGMA_ACCESS_TOKEN;
   if (!token) return NextResponse.json({ error: "No Figma token" }, { status: 400 });
 
   await new Promise(r => setTimeout(r, 500));

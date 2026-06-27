@@ -11,7 +11,9 @@ async function sendApprovalNotification(newUserEmail: string, org: { id: string;
   });
   if (!admin?.email) return;
   const baseUrl = process.env.AUTH_URL || "http://localhost:3000";
-  const approvalUrl = `${baseUrl}/api/approve?orgId=${org.id}&email=${encodeURIComponent(newUserEmail)}`;
+  const { signLink } = await import("./link-signing");
+  const token = signLink({ purpose: "approve", orgId: org.id, email: newUserEmail, exp: Math.floor(Date.now() / 1000) + 7 * 86400 });
+  const approvalUrl = `${baseUrl}/api/approve?token=${encodeURIComponent(token)}`;
   try {
     const { sendCampaignEmail, loadSmtpConfig } = await import("./email");
     const smtp = await loadSmtpConfig(org.id);

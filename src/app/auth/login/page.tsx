@@ -30,7 +30,7 @@ export default function LoginPage() {
 
     // In dev mode, use passwordless login. In production, use password.
     const provider = isDev ? "dev" : "login";
-    const params: Record<string, string> = { email, redirect: "false" };
+    const params: any = { email, redirect: false };
     if (!isDev) params.password = password;
 
     try {

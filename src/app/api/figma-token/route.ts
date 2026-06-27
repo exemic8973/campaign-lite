@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOrgId } from "@/lib/session-utils";
+import { encrypt } from "@/lib/encryption";
 
 export async function PUT(request: Request) {
   const session = await auth();
@@ -12,9 +13,10 @@ export async function PUT(request: Request) {
 
   const body = await request.json();
 
+  const figmaToken = body.figmaToken ? encrypt(body.figmaToken) : null;
   await prisma.organization.update({
     where: { id: orgId },
-    data: { figmaToken: body.figmaToken || null },
+    data: { figmaToken },
   });
 
   return NextResponse.json({ ok: true });
@@ -32,5 +34,5 @@ export async function GET() {
     select: { figmaToken: true },
   });
 
-  return NextResponse.json({ configured: !!org?.figmaToken || !!process.env.FIGMA_ACCESS_TOKEN });
+  return NextResponse.json({ configured: !!(org?.figmaToken || process.env.FIGMA_ACCESS_TOKEN) });
 }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { requireOrg } from "@/lib/session-utils";
 
 export async function GET(
   _request: Request,
@@ -9,7 +10,12 @@ export async function GET(
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const orgId = await requireOrg(session);
   const { id } = await params;
+
+  // Verify parent campaign belongs to this org
+  const owns = await prisma.campaign.findFirst({ where: { id, organizationId: orgId }, select: { id: true } });
+  if (!owns) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const events = await prisma.campaignEvent.findMany({
     where: { campaignId: id },
@@ -46,7 +52,13 @@ export async function DELETE(
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const orgId = await requireOrg(session);
   const { id } = await params;
+
+  // Verify parent campaign belongs to this org
+  const owns = await prisma.campaign.findFirst({ where: { id, organizationId: orgId }, select: { id: true } });
+  if (!owns) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
   await prisma.campaignEvent.deleteMany({ where: { campaignId: id } });
   return NextResponse.json({ ok: true });
 }

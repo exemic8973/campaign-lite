@@ -28,10 +28,10 @@ async function evaluateSegmentCount(orgId: string, rules: any): Promise<number> 
       case "notEquals":
         return { [field]: { not: value === "true" ? true : value === "false" ? false : value } };
       case "has":
-        // Tags are stored as JSON string - use contains on the string
-        return { tags: { contains: value } };
+        // Tags is String[] in Postgres - use has filter
+        return { tags: { has: value } };
       case "notHas":
-        return { tags: { not: { contains: value } } };
+        return { NOT: { tags: { has: value } } };
       case "before":
         return { [field]: { lt: new Date(value) } };
       case "after":

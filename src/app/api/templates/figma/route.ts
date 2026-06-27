@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getOrgId } from "@/lib/session-utils";
+import { decrypt } from "@/lib/encryption";
 import { figmaFrameToEmail, generateDummyFigmaData, injectImages } from "@/lib/figma-to-email";
 
 export async function POST(request: Request) {
@@ -21,7 +22,8 @@ export async function POST(request: Request) {
     templateName = body.name || "Figma Newsletter (demo)";
   } else if (body.fileKey) {
     const org = await prisma.organization.findUnique({ where: { id: orgId } });
-    const token = body.figmaToken || org?.figmaToken || process.env.FIGMA_ACCESS_TOKEN;
+    const dbToken = org?.figmaToken ? (decrypt(org.figmaToken) || org.figmaToken) : null;
+    const token = body.figmaToken || dbToken || process.env.FIGMA_ACCESS_TOKEN;
     if (!token) return NextResponse.json({ error: "Figma token not configured. Go to Settings to add it." }, { status: 400 });
 
     let apiUrl: string;

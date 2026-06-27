@@ -43,6 +43,19 @@ export async function loadSmtpConfig(orgId: string): Promise<SmtpConfig | null> 
       fromName: org.smtpFromName,
     };
   }
+
+  // Fallback to global env vars if no per-org SMTP is configured
+  if (process.env.SMTP_HOST && process.env.SMTP_USER) {
+    return {
+      host: process.env.SMTP_HOST,
+      port: parseInt(process.env.SMTP_PORT || "587"),
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS || "",
+      fromEmail: process.env.SMTP_FROM_EMAIL,
+      fromName: process.env.SMTP_FROM_NAME,
+    };
+  }
+
   return null;
 }
 

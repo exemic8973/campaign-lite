@@ -10,40 +10,36 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token = searchParams.get("token");
 
-  if (token) {
-    const payload = verifyLink(token);
-    if (!payload || payload.purpose !== "unsubscribe") {
-      return NextResponse.json({ error: "Invalid or expired link" }, { status: 400 });
-    }
-
-    await prisma.contact.update({
-      where: { id: payload.contactId },
-      data: { isSubscribed: false },
-    });
-
-    await prisma.campaignEvent.create({
-      data: {
-        type: "unsubscribe",
-        campaignId: payload.campaignId,
-        contactId: payload.contactId,
-        metadata: { via: "signed_link" },
-      },
-    });
-
-    await prisma.campaign.update({
-      where: { id: payload.campaignId },
-      data: { unsubscribeCount: { increment: 1 } },
-    });
+  if (!token) {
+    return NextResponse.json({ error: "Invalid or expired link" }, { status: 400 });
   }
 
-  // Also support legacy contactId parameter (for existing emails in the wild)
-  const contactId = searchParams.get("contactId");
-  const campaignId = searchParams.get("campaignId");
-  if (contactId && campaignId && !token) {
-    await prisma.contact.update({ where: { id: contactId }, data: { isSubscribed: false } });
-    await prisma.campaignEvent.create({ data: { type: "unsubscribe", campaignId, contactId } });
-    await prisma.campaign.update({ where: { id: campaignId }, data: { unsubscribeCount: { increment: 1 } } });
+  const payload = verifyLink(token);
+  if (!payload || payload.purpose !== "unsubscribe") {
+    return NextResponse.json({ error: "Invalid or expired link" }, { status: 400 });
   }
+
+  const campaignId = payload.campaignId!;
+  const contactId = payload.contactId!;
+
+  await prisma.contact.update({
+    where: { id: contactId },
+    data: { isSubscribed: false },
+  });
+
+  await prisma.campaignEvent.create({
+    data: {
+      type: "unsubscribe",
+      campaignId,
+      contactId,
+      metadata: { via: "signed_link" },
+    },
+  });
+
+  await prisma.campaign.update({
+    where: { id: campaignId },
+    data: { unsubscribeCount: { increment: 1 } },
+  });
 
   return new NextResponse(
     `<!DOCTYPE html>

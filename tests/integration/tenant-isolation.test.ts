@@ -106,8 +106,8 @@ test.describe("Tenant isolation — cross-org access returns 404", () => {
   });
 
   test.afterAll(async () => {
-    await orgA?.context.close();
-    await orgB?.context.close();
+    await orgA?.context?.close();
+    await orgB?.context?.close();
   });
 
   test.describe("Contacts", () => {
@@ -238,6 +238,68 @@ test.describe("Tenant isolation — cross-org access returns 404", () => {
       // Verify still exists in Org A
       const respA = await orgA.page.request.get(`${BASE}/api/workflows/${workflowId}`);
       expect(respA.status()).toBe(200);
+    });
+  });
+
+  test.describe("Campaign Events", () => {
+    test("GET events from other org's campaign returns 404", async () => {
+      const resp = await orgB.page.request.get(`${BASE}/api/campaigns/${campaignId}/events`);
+      expect(resp.status()).toBe(404);
+    });
+
+    test("DELETE events from other org's campaign returns 404", async () => {
+      const resp = await orgB.page.request.delete(`${BASE}/api/campaigns/${campaignId}/events`);
+      expect(resp.status()).toBe(404);
+    });
+
+    test("GET events from own campaign returns 200", async () => {
+      const resp = await orgA.page.request.get(`${BASE}/api/campaigns/${campaignId}/events`);
+      expect(resp.status()).toBe(200);
+    });
+  });
+
+  test.describe("Segment Members", () => {
+    test("GET members from other org's segment returns 404", async () => {
+      const resp = await orgB.page.request.get(`${BASE}/api/segments/members?segmentId=${segmentId}`);
+      expect(resp.status()).toBe(404);
+    });
+
+    test("POST member to other org's segment returns 404", async () => {
+      const resp = await orgB.page.request.post(`${BASE}/api/segments/members`, {
+        data: { segmentId, contactId },
+      });
+      expect(resp.status()).toBe(404);
+    });
+
+    test("DELETE member from other org's segment returns 404", async () => {
+      const resp = await orgB.page.request.delete(`${BASE}/api/segments/members?segmentId=${segmentId}&contactId=${contactId}`);
+      expect(resp.status()).toBe(404);
+    });
+
+    test("GET members from own segment returns 200", async () => {
+      const resp = await orgA.page.request.get(`${BASE}/api/segments/members?segmentId=${segmentId}`);
+      expect(resp.status()).toBe(200);
+    });
+  });
+
+  test.describe("Approve endpoint", () => {
+    test("authenticated cross-org approve returns 403", async () => {
+      // Org B user tries to approve an Org A user
+      const resp = await orgB.page.request.get(`${BASE}/api/approve?email=${orgA.email}`);
+      expect([403, 404]).toContain(resp.status());
+    });
+  });
+
+  test.describe("Legacy unsigned bypass paths", () => {
+    test("unsubscribe without token returns 400", async () => {
+      const resp = await orgA.page.request.get(`${BASE}/api/unsubscribe?contactId=${contactId}&campaignId=${campaignId}`);
+      expect(resp.status()).toBe(400);
+    });
+
+    test("track/open without token returns pixel (no-op)", async () => {
+      const resp = await orgA.page.request.get(`${BASE}/api/track/open?campaignId=${campaignId}&contactId=${contactId}`);
+      // Returns transparent GIF even without token (won't record)
+      expect(resp.status()).toBe(200);
     });
   });
 });

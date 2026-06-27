@@ -2,13 +2,17 @@ import { Queue, Worker, ConnectionOptions } from "bullmq";
 import { sendCampaignEmail, loadSmtpConfig, replaceVariables } from "./email";
 import { prisma } from "./db";
 
+const REDIS_AVAILABLE = !!process.env.REDIS_HOST;
+
 const connection: ConnectionOptions = {
   host: process.env.REDIS_HOST || "localhost",
   port: parseInt(process.env.REDIS_PORT || "6379"),
 };
 
-// Queue for individual recipient emails
-export const emailQueue = new Queue("campaign-emails", { connection });
+// Queue for individual recipient emails (only if Redis is available)
+export const emailQueue = REDIS_AVAILABLE
+  ? new Queue("campaign-emails", { connection })
+  : null;
 
 interface EmailJob {
   campaignId: string;
@@ -22,79 +26,66 @@ interface EmailJob {
   trackingPixel?: string;
 }
 
-// Worker processes jobs
-const worker = new Worker("campaign-emails", async (job) => {
-  const data = job.data as EmailJob;
-  const smtp = await loadSmtpConfig(data.orgId);
+// Worker processes jobs (only if Redis is available)
+// Redis-based worker (only when Redis is available)
+function startWorker() {
+  if (!REDIS_AVAILABLE) return null;
 
-  await sendCampaignEmail({
-    to: [data.to],
-    subject: data.subject,
-    html: data.html,
-    fromName: data.fromName,
-    fromEmail: data.fromEmail,
-    campaignId: data.campaignId,
-    trackingPixel: data.trackingPixel,
-    smtp,
-  });
+  const w = new Worker("campaign-emails", async (job) => {
+    const data = job.data as EmailJob;
+    const smtp = await loadSmtpConfig(data.orgId);
 
-  // Record sent event
-  await prisma.campaignEvent.create({
-    data: {
-      type: "sent",
-      recipientEmail: data.to,
-      campaignId: data.campaignId,
-      contactId: data.contactId,
-    },
-  });
+    await sendCampaignEmail({
+      to: [data.to], subject: data.subject, html: data.html,
+      fromName: data.fromName, fromEmail: data.fromEmail,
+      campaignId: data.campaignId, trackingPixel: data.trackingPixel, smtp,
+    });
 
-  // Increment campaign sent count
-  await prisma.campaign.update({
-    where: { id: data.campaignId },
-    data: { sentCount: { increment: 1 } },
-  });
+    await prisma.campaignEvent.create({
+      data: { type: "sent", recipientEmail: data.to, campaignId: data.campaignId, contactId: data.contactId },
+    });
+    await prisma.campaign.update({
+      where: { id: data.campaignId },
+      data: { sentCount: { increment: 1 } },
+    });
+    return { sent: true };
+  }, { connection, concurrency: 5 });
 
-  return { sent: true };
-}, { connection, concurrency: 5 });
-
-worker.on("failed", async (job, err) => {
-  if (job) {
+  w.on("failed", async (job, err) => {
+    if (!job) return;
     const data = job.data as EmailJob;
     await prisma.campaignEvent.create({
-      data: {
-        type: "bounce",
-        recipientEmail: data.to,
-        metadata: { reason: err?.message || "send_failed" },
-        campaignId: data.campaignId,
-        contactId: data.contactId,
-      },
+      data: { type: "bounce", recipientEmail: data.to, metadata: { reason: err?.message || "send_failed" }, campaignId: data.campaignId, contactId: data.contactId },
     });
     await prisma.campaign.update({
       where: { id: data.campaignId },
       data: { bounceCount: { increment: 1 } },
     });
-  }
-});
+  });
 
-worker.on("completed", async (job) => {
-  if (!job) return;
-  const data = job.data as EmailJob;
-  // Check if all jobs for this campaign are done
-  const pending = await emailQueue.getJobCounts();
-  const campaignJobs = pending.waiting + pending.active + pending.delayed;
-  if (campaignJobs === 0) {
-    // Wait a bit for the last job's DB write to complete
-    setTimeout(async () => {
-      const remaining = await emailQueue.getJobCounts();
-      if (remaining.waiting + remaining.active + remaining.delayed === 0) {
-        await prisma.campaign.update({
-          where: { id: data.campaignId },
-          data: { status: "sent", sentAt: new Date() },
-        }).catch(() => {});
-      }
-    }, 2000);
-  }
-});
+  w.on("completed", async (job) => {
+    if (!job) return;
+    const data = job.data as EmailJob;
+    const pending = await emailQueue!.getJobCounts();
+    if (pending.waiting + pending.active + pending.delayed === 0) {
+      setTimeout(async () => {
+        const remaining = await emailQueue!.getJobCounts();
+        if (remaining.waiting + remaining.active + remaining.delayed === 0) {
+          await prisma.campaign.update({
+            where: { id: data.campaignId },
+            data: { status: "sent", sentAt: new Date() },
+          }).catch(() => {});
+        }
+      }, 2000);
+    }
+  });
+
+  return w;
+}
+
+const worker = startWorker();
+// Keep worker reference alive (used in server environments with Redis)
+void worker;
 
 /**
  * Enqueue a campaign for sending. Returns immediately.
@@ -120,7 +111,8 @@ export async function enqueueCampaign(campaignId: string) {
           const { field, operator, value } = cond;
           if (!allowedFields.has(field)) return { id: "" };
           if (operator === "has") return { tags: { has: value } };
-          if (operator === "contains") return { [field]: { contains: value } };
+          if (operator === "notHas") return { NOT: { tags: { has: value } } };
+          if (field === "tags") return { tags: { has: value } };
           return { [field]: { contains: value } };
         });
       }
@@ -148,7 +140,48 @@ export async function enqueueCampaign(campaignId: string) {
   const fromEmail = smtp?.fromEmail || campaign.fromEmail || process.env.RESEND_FROM_EMAIL || "noreply@campaignlite.dev";
   const fromName = smtp?.fromName || campaign.fromName || "Campaign Lite";
 
-  // Enqueue one job per contact
+  if (!REDIS_AVAILABLE) {
+    // No Redis — send directly (synchronous, one at a time)
+    let sentCount = 0;
+    for (const contact of contacts) {
+      try {
+        const variables: Record<string, string> = {
+          firstName: contact.firstName || "", lastName: contact.lastName || "",
+          email: contact.email || "", phone: contact.phone || "",
+          unsubscribeUrl: `${baseUrl}/api/unsubscribe?contactId=${contact.id}&campaignId=${campaignId}`,
+        };
+        const trackingPixel = campaign.trackOpens
+          ? `${baseUrl}/api/track/open?campaignId=${campaignId}&contactId=${contact.id}`
+          : undefined;
+
+        await sendCampaignEmail({
+          to: [contact.email!],
+          subject: replaceVariables(subject, variables),
+          html: replaceVariables(templateHtml, variables),
+          fromName, fromEmail,
+          campaignId,
+          trackingPixel,
+          smtp,
+        });
+
+        await prisma.campaignEvent.create({
+          data: { type: "sent", recipientEmail: contact.email!, campaignId, contactId: contact.id },
+        });
+        sentCount++;
+      } catch {
+        await prisma.campaignEvent.create({
+          data: { type: "bounce", recipientEmail: contact.email!, campaignId, contactId: contact.id, metadata: { reason: "send_failed" } },
+        });
+      }
+    }
+    await prisma.campaign.update({
+      where: { id: campaignId },
+      data: { status: "sent", sentAt: new Date(), sentCount, totalRecipients: contacts.length },
+    });
+    return sentCount;
+  }
+
+  // Enqueue one job per contact (Redis path)
   const jobs = contacts.map((contact) => {
     const variables: Record<string, string> = {
       firstName: contact.firstName || "", lastName: contact.lastName || "",
@@ -171,7 +204,7 @@ export async function enqueueCampaign(campaignId: string) {
     };
   });
 
-  await emailQueue.addBulk(jobs);
+  await emailQueue!.addBulk(jobs);
   await prisma.campaign.update({
     where: { id: campaignId },
     data: { status: "sending", totalRecipients: contacts.length },

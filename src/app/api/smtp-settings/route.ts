@@ -15,14 +15,24 @@ export async function GET() {
     select: { smtpHost: true, smtpPort: true, smtpUser: true, smtpPass: true, smtpFromEmail: true, smtpFromName: true },
   });
 
+  const configured = !!(org?.smtpHost && org?.smtpUser);
+
+  // Show env var fallback when no per-org SMTP is configured
+  const host = org?.smtpHost || process.env.SMTP_HOST || "";
+  const port = org?.smtpPort || parseInt(process.env.SMTP_PORT || "587");
+  const user = org?.smtpUser || process.env.SMTP_USER || "";
+  const fromEmail = org?.smtpFromEmail || process.env.SMTP_FROM_EMAIL || "";
+  const fromName = org?.smtpFromName || process.env.SMTP_FROM_NAME || "";
+
   return NextResponse.json({
-    configured: !!(org?.smtpHost && org?.smtpUser),
-    host: org?.smtpHost || "",
-    port: org?.smtpPort || 587,
-    user: org?.smtpUser || "",
+    configured,
+    envFallback: !configured && !!process.env.SMTP_HOST,
+    host,
+    port,
+    user,
     pass: org?.smtpPass ? "••••••••" : "",
-    fromEmail: org?.smtpFromEmail || "",
-    fromName: org?.smtpFromName || "",
+    fromEmail,
+    fromName,
   });
 }
 
