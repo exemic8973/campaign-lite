@@ -57,20 +57,27 @@ export async function PUT(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const orgId = await getOrgId(session);
+  if (!orgId) return NextResponse.json({ error: "Org not found" }, { status: 404 });
+
   const body = await request.json();
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id") || body.id;
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const variables = extractVariables(body.bodyHtml || "");
-  const template = await prisma.template.update({
-    where: { id },
+  const { count } = await prisma.template.updateMany({
+    where: { id, organizationId: orgId },
     data: {
       name: body.name, description: body.description, subject: body.subject,
       bodyHtml: body.bodyHtml, variables,
       previewText: body.previewText, category: body.category,
     },
   });
+  if (count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const template = await prisma.template.findUnique({ where: { id } });
+  if (!template) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ ...template, variables: JSON.stringify(template.variables || []) });
 }
 
@@ -78,10 +85,14 @@ export async function DELETE(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const orgId = await getOrgId(session);
+  if (!orgId) return NextResponse.json({ error: "Org not found" }, { status: 404 });
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  await prisma.template.delete({ where: { id } });
+  const { count } = await prisma.template.deleteMany({ where: { id, organizationId: orgId } });
+  if (count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ success: true });
 }

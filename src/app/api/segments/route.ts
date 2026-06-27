@@ -88,10 +88,13 @@ export async function PUT(request: NextRequest) {
   const rules = body.rules || null;
   const contactCount = rules ? await evaluateSegmentCount(orgId, rules) : 0;
 
-  const segment = await prisma.segment.update({
-    where: { id },
+  const { count } = await prisma.segment.updateMany({
+    where: { id, organizationId: orgId },
     data: { name: body.name, description: body.description, rules, contactCount },
   });
+  if (count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const segment = await prisma.segment.findUnique({ where: { id } });
   return NextResponse.json(segment);
 }
 
@@ -99,10 +102,14 @@ export async function DELETE(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const orgId = await getOrgId(session);
+  if (!orgId) return NextResponse.json({ error: "Org not found" }, { status: 404 });
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  await prisma.segment.delete({ where: { id } });
+  const { count } = await prisma.segment.deleteMany({ where: { id, organizationId: orgId } });
+  if (count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ success: true });
 }

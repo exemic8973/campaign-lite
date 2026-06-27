@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-
-async function getUserOrg(session: any) {
-  const email = session?.user?.email;
-  if (!email) return null;
-  const user = await prisma.user.findUnique({ where: { email } });
-  return user?.organizationId || null;
-}
+import { getOrgId } from "@/lib/session-utils";
 
 export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const orgId = await getUserOrg(session);
+  const orgId = await getOrgId(session);
   if (!orgId) return NextResponse.json({ error: "Org not found" }, { status: 404 });
 
   const { searchParams } = new URL(request.url);
@@ -45,7 +39,7 @@ export async function POST(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const orgId = await getUserOrg(session);
+  const orgId = await getOrgId(session);
   if (!orgId) return NextResponse.json({ error: "Org not found" }, { status: 404 });
 
   const body = await request.json();
@@ -84,6 +78,9 @@ export async function PUT(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const orgId = await getOrgId(session);
+  if (!orgId) return NextResponse.json({ error: "Org not found" }, { status: 404 });
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
@@ -91,8 +88,8 @@ export async function PUT(request: NextRequest) {
   const body = await request.json();
   const tags: string[] = Array.isArray(body.tags) ? body.tags : (typeof body.tags === "string" ? JSON.parse(body.tags || "[]") : []);
 
-  const contact = await prisma.contact.update({
-    where: { id },
+  const { count } = await prisma.contact.updateMany({
+    where: { id, organizationId: orgId },
     data: {
       email: body.email || null,
       phone: body.phone || null,
@@ -101,6 +98,9 @@ export async function PUT(request: NextRequest) {
       tags,
     },
   });
+  if (count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const contact = await prisma.contact.findUnique({ where: { id } });
   return NextResponse.json(contact);
 }
 
@@ -108,10 +108,14 @@ export async function DELETE(request: NextRequest) {
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  const orgId = await getOrgId(session);
+  if (!orgId) return NextResponse.json({ error: "Org not found" }, { status: 404 });
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
-  await prisma.contact.delete({ where: { id } });
+  const { count } = await prisma.contact.deleteMany({ where: { id, organizationId: orgId } });
+  if (count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
   return NextResponse.json({ success: true });
 }
