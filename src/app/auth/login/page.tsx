@@ -36,7 +36,12 @@ export default function LoginPage() {
     try {
       const result = await signIn(provider, params);
       if (result?.error) {
-        setError(result.error === "CredentialsSignin" ? "Invalid email or password" : result.error);
+        // Show the specific error from the authorize callback
+        if (result.error === "CredentialsSignin") {
+          setError("Invalid email or password");
+        } else {
+          setError(result.error);
+        }
       } else {
         router.push("/dashboard");
       }
@@ -74,7 +79,16 @@ export default function LoginPage() {
                 <Input id="password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Enter your password" required />
               </div>
             )}
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+                {error.includes("Sign up") && (
+                  <div className="mt-1">
+                    <Link href="/auth/signup" className="underline font-medium">Create an account</Link>
+                  </div>
+                )}
+              </div>
+            )}
             <Button type="submit" className="w-full gap-2" disabled={loading}>
               <LogIn className="h-5 w-5" />
               {loading ? "Signing in..." : "Sign in with email"}

@@ -84,13 +84,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        if (!credentials?.email || !credentials?.password) {
+          throw new Error("Email and password are required");
+        }
         const email = credentials.email as string;
         const user = await prisma.user.findUnique({ where: { email } });
-        if (!user?.password) return null;
-        const valid = await bcrypt.compare(credentials.password as string, user.password);
-        if (!valid) return null;
+        if (!user) {
+          throw new Error("No account registered with this email. Sign up first.");
+        }
+        if (!user.password) {
+          throw new Error("This account uses a different sign-in method (e.g. Google). ");
+        }
         if (!user.approved) throw new Error("Account awaiting admin approval");
+        const valid = await bcrypt.compare(credentials.password as string, user.password);
+        if (!valid) throw new Error("Incorrect password");
         return { id: user.id, email: user.email, name: user.name };
       },
     }),

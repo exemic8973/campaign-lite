@@ -471,3 +471,48 @@ For each phase, return:
 5. Any assumptions made or breaking changes introduced.
 
 At the very end, produce a **traceability table** mapping each numbered item in this brief (1.1 … 5.3) to the commit(s)/files that resolve it, so completeness can be verified at a glance.
+- GET /
+
+Status: 307
+
+## Request
+
+Started: Jun 27 22:24:14.14 GMT-5
+
+Request ID: sqccz-1782617054144-954e9fa4e45d
+
+Path: /
+
+Host: digitalcampaign-b3j6llamc-wei-lis-projects-25565b7d.vercel.app
+
+User Agent: vercel-favicon/1.0
+
+Received in San Francisco, USA (sfo1)
+
+Firewall Allowed
+
+### Middleware
+
+307 Temporary Redirect
+
+Memory Used / Maximum: 259 MB / 2048 MB
+
+External APIs
+
+No outgoing requests
+
+### Redirect
+
+307 Temporary Redirect
+
+Redirect Location: /auth/login?[REDACTED]
+
+Response finished in 781ms
+
+## Deployment Information
+
+Deployment ID: dpl_BWq9S4SBKbDqB9b4wAGnV64wHdr1
+
+Environment: production
+
+Branch: main
