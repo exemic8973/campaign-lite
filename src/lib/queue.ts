@@ -83,8 +83,9 @@ function startWorker() {
   return w;
 }
 
-const worker = startWorker();
-// Keep worker reference alive (used in server environments with Redis)
+// Start a worker ONLY when explicitly requested (dedicated worker process).
+// When queue.ts is imported by API routes (for enqueueCampaign), no worker starts here.
+const worker = process.env.RUN_WORKER === "1" ? startWorker() : null;
 void worker;
 
 /**
