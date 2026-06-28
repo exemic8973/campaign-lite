@@ -1,6 +1,7 @@
 import { Queue, Worker, ConnectionOptions } from "bullmq";
 import { sendCampaignEmail, loadSmtpConfig, replaceVariables } from "./email";
 import { prisma } from "./db";
+import { signLink } from "./link-signing";
 
 const REDIS_AVAILABLE = !!process.env.REDIS_HOST;
 
@@ -66,17 +67,16 @@ function startWorker() {
   w.on("completed", async (job) => {
     if (!job) return;
     const data = job.data as EmailJob;
-    const pending = await emailQueue!.getJobCounts();
-    if (pending.waiting + pending.active + pending.delayed === 0) {
-      setTimeout(async () => {
-        const remaining = await emailQueue!.getJobCounts();
-        if (remaining.waiting + remaining.active + remaining.delayed === 0) {
-          await prisma.campaign.update({
-            where: { id: data.campaignId },
-            data: { status: "sent", sentAt: new Date() },
-          }).catch(() => {});
-        }
-      }, 2000);
+    // Per-campaign completion: check this campaign's events vs totalRecipients
+    await finalizeCampaignIfDone(data.campaignId);
+  });
+
+  w.on("failed", async (job) => {
+    if (!job) return;
+    const data = job.data as EmailJob;
+    // Also check on failure — the campaign might be done even with bounces
+    if (job.attemptsMade >= (job.opts.attempts || 3) - 1) {
+      await finalizeCampaignIfDone(data.campaignId);
     }
   });
 
@@ -86,6 +86,70 @@ function startWorker() {
 const worker = startWorker();
 // Keep worker reference alive (used in server environments with Redis)
 void worker;
+
+/**
+ * Check if a campaign is fully sent/bounced and finalize its status.
+ * Call on every job completion/failure — idempotent.
+ */
+export async function finalizeCampaignIfDone(campaignId: string) {
+  try {
+    const campaign = await prisma.campaign.findUnique({
+      where: { id: campaignId },
+      select: { status: true, totalRecipients: true },
+    });
+    if (!campaign || campaign.status !== "sending") return;
+    if (campaign.totalRecipients === 0) return;
+
+    const delivered = await prisma.campaignEvent.count({
+      where: { campaignId, type: { in: ["sent", "bounce"] } },
+    });
+
+    if (delivered >= campaign.totalRecipients) {
+      await prisma.campaign.update({
+        where: { id: campaignId },
+        data: { status: "sent", sentAt: new Date() },
+      });
+    }
+  } catch {
+    // Best-effort — reconciler will retry
+  }
+}
+
+/**
+ * Reconciliation sweep: find campaigns stuck in \"sending\" and finalize them
+ * if all jobs are accounted for. Call periodically (e.g. every 60s).
+ */
+export async function reconcileStuckCampaigns() {
+  try {
+    const stuck = await prisma.campaign.findMany({
+      where: { status: "sending" },
+      select: { id: true, totalRecipients: true },
+    });
+
+    for (const c of stuck) {
+      if (c.totalRecipients === 0) {
+        await prisma.campaign.update({
+          where: { id: c.id },
+          data: { status: "sent", sentAt: new Date() },
+        });
+        continue;
+      }
+
+      const delivered = await prisma.campaignEvent.count({
+        where: { campaignId: c.id, type: { in: ["sent", "bounce"] } },
+      });
+
+      if (delivered >= c.totalRecipients) {
+        await prisma.campaign.update({
+          where: { id: c.id },
+          data: { status: "sent", sentAt: new Date() },
+        });
+      }
+    }
+  } catch {
+    // Best-effort
+  }
+}
 
 /**
  * Enqueue a campaign for sending. Returns immediately.
@@ -145,13 +209,15 @@ export async function enqueueCampaign(campaignId: string) {
     let sentCount = 0;
     for (const contact of contacts) {
       try {
+        const unsubToken = signLink({ contactId: contact.id, campaignId, purpose: "unsubscribe" });
+        const trackToken = signLink({ contactId: contact.id, campaignId, purpose: "track" });
         const variables: Record<string, string> = {
           firstName: contact.firstName || "", lastName: contact.lastName || "",
           email: contact.email || "", phone: contact.phone || "",
-          unsubscribeUrl: `${baseUrl}/api/unsubscribe?contactId=${contact.id}&campaignId=${campaignId}`,
+          unsubscribeUrl: `${baseUrl}/api/unsubscribe?token=${unsubToken}`,
         };
         const trackingPixel = campaign.trackOpens
-          ? `${baseUrl}/api/track/open?campaignId=${campaignId}&contactId=${contact.id}`
+          ? `${baseUrl}/api/track/open?token=${trackToken}`
           : undefined;
 
         await sendCampaignEmail({
@@ -183,13 +249,15 @@ export async function enqueueCampaign(campaignId: string) {
 
   // Enqueue one job per contact (Redis path)
   const jobs = contacts.map((contact) => {
+    const unsubToken = signLink({ contactId: contact.id, campaignId, purpose: "unsubscribe" });
+    const trackToken = signLink({ contactId: contact.id, campaignId, purpose: "track" });
     const variables: Record<string, string> = {
       firstName: contact.firstName || "", lastName: contact.lastName || "",
       email: contact.email || "", phone: contact.phone || "",
-      unsubscribeUrl: `${baseUrl}/api/unsubscribe?contactId=${contact.id}&campaignId=${campaignId}`,
+      unsubscribeUrl: `${baseUrl}/api/unsubscribe?token=${unsubToken}`,
     };
     const trackingPixel = campaign.trackOpens
-      ? `${baseUrl}/api/track/open?campaignId=${campaignId}&contactId=${contact.id}`
+      ? `${baseUrl}/api/track/open?token=${trackToken}`
       : undefined;
 
     return {
