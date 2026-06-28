@@ -33,7 +33,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
   providers: [
-    Google,
+    // Google OAuth — only enabled when credentials are configured
+    ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET ? [Google] : []),
     Credentials({
       id: "signup",
       name: "Sign Up",
@@ -118,6 +119,16 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     })] : []),
   ],
   callbacks: {
+    async signIn({ user, account }) {
+      // Google OAuth gate: block sign-in if user has no organization (not yet provisioned).
+      // When Google is enabled, users must be manually approved by an admin first.
+      if (account?.provider === "google") {
+        const dbUser = await prisma.user.findUnique({ where: { email: user.email! } });
+        if (!dbUser?.organizationId) return false; // Reject — no org assigned
+        if (!dbUser?.approved) return "/pending";   // Redirect to pending page
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user?.id) token.id = user.id;
       if (user?.email) {

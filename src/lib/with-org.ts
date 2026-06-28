@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "./auth";
 import { getOrgId } from "./session-utils";
-import { canAccess, type UserRole } from "./rbac";
+import { hasMinRole, type UserRole } from "./rbac";
 import { ZodSchema, ZodError } from "zod";
 
 export interface OrgContext {
@@ -69,8 +69,8 @@ export function withOrg<TSchema = unknown>(
       return NextResponse.json({ error: "Account not approved" }, { status: 403 });
     }
 
-    // 5. Role check
-    if (!canAccess(ctx.role, minRole)) {
+    // 5. Role rank check (hierarchical, not resource-based)
+    if (!hasMinRole(ctx.role, minRole)) {
       return NextResponse.json({ error: "Insufficient permissions" }, { status: 403 });
     }
 
