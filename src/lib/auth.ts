@@ -32,6 +32,7 @@ async function sendApprovalNotification(newUserEmail: string, org: { id: string;
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
+  trustHost: true,
   providers: [
     // Google OAuth — only enabled when credentials are configured
     ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET ? [Google] : []),
