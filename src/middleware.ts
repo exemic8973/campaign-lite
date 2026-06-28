@@ -32,9 +32,15 @@ export async function middleware(request: NextRequest) {
   }
 
   // Validate JWT via next-auth (Edge-compatible — reads cookie, verifies signature)
+  // NextAuth v5 uses __Secure-authjs.session-token on HTTPS (Vercel),
+  // but next-auth/jwt doesn't look for the __Secure- prefixed cookie by default.
+  const isHttps = request.nextUrl.protocol === "https:" || !!process.env.VERCEL;
   const token = await getToken({
     req: request,
     secret: process.env.AUTH_SECRET,
+    cookieName: isHttps
+      ? "__Secure-authjs.session-token"
+      : "authjs.session-token",
   });
 
   if (!token) {

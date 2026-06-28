@@ -32,7 +32,8 @@ async function sendApprovalNotification(newUserEmail: string, org: { id: string;
 export const { handlers, signIn, signOut, auth } = NextAuth({
   adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" },
-  trustHost: true,
+  // NextAuth v5 beta: trustHost not available in this version;
+  // AUTH_URL env var handles CSRF origin validation
   providers: [
     // Google OAuth — only enabled when credentials are configured
     ...(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET ? [Google] : []),

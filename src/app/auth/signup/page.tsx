@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,37 +10,35 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link";
 import { UserPlus } from "lucide-react";
 
-export default function SignupPage() {
+function SignupForm() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [orgName, setOrgName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const err = searchParams.get("error");
+    if (err) setError(err);
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError("");
-    try {
-      const result = await signIn("signup", {
-        name, email, password, orgName,
-        redirect: false,
-      });
-      if (result?.error) {
-        if (result.error.includes("Awaiting")) {
-          router.push("/pending");
-          return;
-        }
-        setError(result.error);
-      } else {
-        router.push("/dashboard");
-      }
-    } catch {
-      setError("Registration failed");
-    }
+
+    // Submit without redirect:false so the browser follows the
+    // redirect chain naturally, committing the session cookie.
+    await signIn("signup", {
+      name, email, password, orgName,
+      callbackUrl: "/dashboard",
+    });
+
+    // signIn navigates away on success
     setLoading(false);
+    setError("Signup failed — try again");
   };
 
   return (
@@ -68,7 +66,11 @@ export default function SignupPage() {
               <Label htmlFor="orgName">Organization Name</Label>
               <Input id="orgName" value={orgName} onChange={e => setOrgName(e.target.value)} placeholder="My Company" required />
             </div>
-            {error && <p className="text-xs text-destructive">{error}</p>}
+            {error && (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+                {error}
+              </div>
+            )}
             <Button type="submit" className="w-full gap-2" disabled={loading}>
               <UserPlus className="h-4 w-4" />
               {loading ? "Creating..." : "Create Account"}
@@ -80,5 +82,13 @@ export default function SignupPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><p>Loading...</p></div>}>
+      <SignupForm />
+    </Suspense>
   );
 }
