@@ -2,20 +2,21 @@
  * Dedicated BullMQ worker entrypoint.
  *
  * Run as a separate long-running process:
- *   npm run worker        (dev — uses tsx)
- *   node dist/worker.js   (production build)
+ *   npm run worker        (dev)
+ *   npm run worker:prod   (production)
  *
- * This keeps the worker alive independent of HTTP server restarts.
- * Sets RUN_WORKER=1 before importing queue.ts so the worker starts here
- * and nowhere else.
+ * The RUN_WORKER env var is set by the npm script BEFORE the process starts,
+ * so static imports see it regardless of hoisting.
  */
-process.env.RUN_WORKER = "1";
-
 import "./lib/queue";
+
+// Dynamic import so reconcileStuckCampaigns is loaded after queue.ts.
+// Static import here is fine since the function is exported; the critical
+// part is that queue.ts sees RUN_WORKER=1 before its module body runs,
+// which cross-env guarantees.
 import { reconcileStuckCampaigns } from "./lib/queue";
 
 // In-worker reconciler: sweep stuck campaigns every 60s.
-// This avoids needing an HTTP cron route for the common case.
 setInterval(() => {
   reconcileStuckCampaigns().catch(() => {});
 }, 60_000);

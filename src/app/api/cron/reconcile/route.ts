@@ -12,23 +12,24 @@ function constantTimeEqual(a: string, b: string): boolean {
 
 /**
  * Cron endpoint — runs every ~60s to finalize campaigns stuck in "sending".
- * Protected by CRON_SECRET (set in env). Vercel Cron passes its own header;
- * accept either Vercel's x-vercel-cron header or an Authorization: Bearer <CRON_SECRET>.
+ * Protected by CRON_SECRET (must be set in env). Accepts either:
+ *   ?secret=<CRON_SECRET>           for external schedulers
+ *   Authorization: Bearer <CRON_SECRET>
  */
 export async function GET(req: NextRequest) {
-  // Vercel Cron sends this header automatically — accept it
-  if (req.headers.get("x-vercel-cron") === "1") {
-    await reconcileStuckCampaigns();
-    return NextResponse.json({ ok: true });
+  const secret = process.env.CRON_SECRET;
+  if (!secret) {
+    return NextResponse.json({ error: "CRON_SECRET not configured" }, { status: 500 });
   }
 
-  // External callers must pass CRON_SECRET
-  if (process.env.CRON_SECRET) {
-    const auth = req.headers.get("authorization") || "";
-    const expected = `Bearer ${process.env.CRON_SECRET}`;
-    if (!constantTimeEqual(auth, expected)) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+  // Accept query param or Authorization header
+  const querySecret = req.nextUrl.searchParams.get("secret");
+  const authHeader = req.headers.get("authorization") || "";
+  const bearerToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : "";
+
+  const provided = querySecret || bearerToken;
+  if (!provided || !constantTimeEqual(provided, secret)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   await reconcileStuckCampaigns();

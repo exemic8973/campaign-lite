@@ -1,7 +1,7 @@
 {
   "crons": [
     {
-      "path": "/api/cron/reconcile",
+      "path": "/api/cron/reconcile?secret=${CRON_SECRET}",
       "schedule": "* * * * *"
     }
   ]
