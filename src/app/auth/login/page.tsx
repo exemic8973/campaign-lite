@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,16 +10,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import Link from "next/link";
 import { Chrome, LogIn } from "lucide-react";
 
-export default function LoginPage() {
+function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [isDev, setIsDev] = useState(false);
-  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Handle errors passed via URL params
+  useEffect(() => {
+    const err = searchParams.get("error");
+    if (err === "CredentialsSignin") setError("Invalid email or password");
+    else if (err) setError(err);
+  }, [searchParams]);
 
   useEffect(() => {
-    // Check if we're in dev mode (dev provider exists)
     setIsDev(window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
   }, []);
 
@@ -28,26 +34,19 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    // In dev mode, use passwordless login. In production, use password.
     const provider = isDev ? "dev" : "login";
-    const params: any = { email, redirect: false };
-    if (!isDev) params.password = password;
 
-    try {
-      const result = await signIn(provider, params);
-      if (result?.error) {
-        // Show the specific error from the authorize callback
-        if (result.error === "CredentialsSignin") {
-          setError("Invalid email or password");
-        } else {
-          setError(result.error);
-        }
-      } else {
-        router.push("/dashboard");
-      }
-    } catch {
-      setError("Login failed");
+    // Submit without redirect: false so the browser naturally follows
+    // the 302 redirect chain, committing the session cookie before
+    // the request to '/' arrives. On error, NextAuth redirects to
+    // this page with ?error=... which we catch in the useEffect above.
+    if (isDev) {
+      await signIn(provider, { email, callbackUrl: "/dashboard" });
+    } else {
+      await signIn(provider, { email, password, callbackUrl: "/dashboard" });
     }
+
+    // signIn navigates away on success; if we reach here, it failed.
     setLoading(false);
   };
 
@@ -82,7 +81,7 @@ export default function LoginPage() {
             {error && (
               <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
                 {error}
-                {error.includes("Sign up") && (
+                {(error.includes("No account") || error.includes("Sign up") || error.includes("registered")) && (
                   <div className="mt-1">
                     <Link href="/auth/signup" className="underline font-medium">Create an account</Link>
                   </div>
@@ -100,5 +99,13 @@ export default function LoginPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center"><p>Loading...</p></div>}>
+      <LoginForm />
+    </Suspense>
   );
 }
